@@ -2,7 +2,7 @@
 
 A Slack bot that automates Agile standups by pulling data from Jira and Google Calendar, then posting formatted daily standup messages.
 
-Built as a portfolio project for an Atlassian Graduate Application.
+Built as a portfolio project and to explore interest in project management software.
 
 ## Architecture
 
