@@ -94,6 +94,14 @@ export function validateConfig(config: Config): string[] {
     errors.push(`NODE_ENV must be one of: ${validEnvs.join(', ')}`);
   }
 
+  if (!config.firebase.projectId || !config.firebase.privateKey || !config.firebase.clientEmail) {
+    console.warn('[CONFIG] Firebase credentials not fully configured. Database features will be unavailable.');
+  }
+
+  if (!config.app.encryptionKey) {
+    console.warn('[CONFIG] ENCRYPTION_KEY not set. Token encryption will not work.');
+  }
+
   return errors;
 }
 

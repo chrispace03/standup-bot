@@ -1,4 +1,4 @@
-import { config, validateConfig } from './config';
+import { config, validateConfig, initializeFirebase } from './config';
 import { createApp } from './app';
 
 const configErrors = validateConfig(config);
@@ -6,6 +6,14 @@ if (configErrors.length > 0) {
   console.error('[CONFIG] Validation errors:');
   configErrors.forEach((err) => console.error(`  - ${err}`));
   process.exit(1);
+}
+
+try {
+  initializeFirebase();
+  console.log('[FIREBASE] Firestore initialized successfully');
+} catch (err) {
+  console.warn('[FIREBASE] Could not initialize Firestore. Database features will be unavailable.');
+  console.warn('[FIREBASE]', (err as Error).message);
 }
 
 const app = createApp();

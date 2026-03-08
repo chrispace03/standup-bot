@@ -31,30 +31,20 @@ describe('404 handler', () => {
   });
 });
 
-describe('Stub endpoints', () => {
-  it('GET /api/user/:slackId returns stub', async () => {
+describe('Database-backed routes without Firebase', () => {
+  it('GET /api/user/:slackId returns 503 when database unavailable', async () => {
     const res = await request(app).get('/api/user/U12345');
-    expect(res.status).toBe(200);
-    expect(res.body.slackId).toBe('U12345');
+    expect(res.status).toBe(503);
+    expect(res.body).toHaveProperty('error');
   });
 
-  it('PUT /api/user/:slackId returns stub', async () => {
-    const res = await request(app)
-      .put('/api/user/U12345')
-      .send({ displayName: 'Test' });
-    expect(res.status).toBe(200);
-    expect(res.body.slackId).toBe('U12345');
+  it('POST /api/standup/trigger returns 400 without userId', async () => {
+    const res = await request(app).post('/api/standup/trigger').send({});
+    expect(res.status).toBe(400);
   });
 
-  it('POST /api/standup/trigger returns stub', async () => {
-    const res = await request(app).post('/api/standup/trigger');
-    expect(res.status).toBe(200);
-    expect(res.body.triggered).toBe(false);
-  });
-
-  it('GET /api/standup/history returns empty records', async () => {
+  it('GET /api/standup/history returns 400 without userId', async () => {
     const res = await request(app).get('/api/standup/history');
-    expect(res.status).toBe(200);
-    expect(res.body.records).toEqual([]);
+    expect(res.status).toBe(400);
   });
 });
