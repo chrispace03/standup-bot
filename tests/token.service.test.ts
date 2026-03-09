@@ -54,6 +54,7 @@ describe('TokenService', () => {
           refreshToken: encrypt('jira-refresh', TEST_KEY),
           expiresAt: mockTimestamp(new Date()),
           cloudId: 'cloud-123',
+          siteUrl: 'https://myteam.atlassian.net',
         },
         updatedAt: mockTimestamp(new Date()),
       });
@@ -61,6 +62,7 @@ describe('TokenService', () => {
       const result = await service.getTokens('U12345');
       expect(result!.jira!.accessToken).toBe('jira-token');
       expect(result!.jira!.cloudId).toBe('cloud-123');
+      expect(result!.jira!.siteUrl).toBe('https://myteam.atlassian.net');
     });
   });
 
@@ -89,10 +91,12 @@ describe('TokenService', () => {
         refreshToken: 'jira-refresh',
         expiresAt: new Date('2026-12-31'),
         cloudId: 'cloud-123',
+        siteUrl: 'https://myteam.atlassian.net',
       });
 
       const savedData = mocks.mockDocRef.set.mock.calls[0][0];
       expect(savedData.jira.cloudId).toBe('cloud-123');
+      expect(savedData.jira.siteUrl).toBe('https://myteam.atlassian.net');
       expect(savedData.jira.accessToken).not.toBe('jira-plain');
     });
   });

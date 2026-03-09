@@ -8,7 +8,7 @@ export interface TokenSet {
 export interface UserTokens {
   slackUserId: string;
   slack?: TokenSet;
-  jira?: TokenSet & { cloudId: string };
+  jira?: TokenSet & { cloudId: string; siteUrl: string };
   google?: TokenSet;
   updatedAt: Date;
 }

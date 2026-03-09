@@ -4,3 +4,10 @@ export {
   formatSettingsMessage,
   formatConnectionStatus,
 } from './slack-formatter';
+export {
+  buildJiraAuthUrl,
+  exchangeJiraCode,
+  refreshJiraToken,
+  getAccessibleResources,
+  ensureValidToken,
+} from './jira-auth.utils';

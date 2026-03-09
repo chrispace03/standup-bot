@@ -5,6 +5,8 @@ import { AppError } from '../middleware';
 import { UserService } from '../services/user.service';
 import { TeamService } from '../services/team.service';
 import { TokenService } from '../services/token.service';
+import { JiraService } from '../services/jira.service';
+import { buildJiraAuthUrl, exchangeJiraCode, getAccessibleResources } from '../utils/jira-auth.utils';
 
 const router = Router();
 
@@ -92,6 +94,68 @@ router.get('/slack/callback', async (req: Request, res: Response, next: NextFunc
     });
 
     res.send('<html><body><h1>Slack connected!</h1><p>You can close this window.</p></body></html>');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Jira OAuth 2.0 (3LO) ---
+
+router.get('/jira', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const slackUserId = req.query.slackUserId as string;
+    if (!slackUserId) throw new AppError('slackUserId query parameter is required', 400);
+
+    // TODO: Use signed state parameter in production (CSRF protection)
+    const authUrl = buildJiraAuthUrl(config.jira.clientId, config.jira.redirectUri, slackUserId);
+    res.redirect(authUrl);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/jira/callback', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const code = req.query.code as string;
+    const slackUserId = req.query.state as string;
+    if (!code) throw new AppError('Missing authorization code', 400);
+    if (!slackUserId) throw new AppError('Missing state parameter', 400);
+
+    // Exchange code for tokens
+    const tokenResponse = await exchangeJiraCode(
+      code,
+      config.jira.clientId,
+      config.jira.clientSecret,
+      config.jira.redirectUri
+    );
+
+    // Get cloud ID and site URL
+    const resources = await getAccessibleResources(tokenResponse.access_token);
+    if (resources.length === 0) {
+      throw new AppError('No Jira sites found for this account', 400);
+    }
+    const { id: cloudId, url: siteUrl } = resources[0];
+
+    const db = getDb();
+    const userService = new UserService(db);
+    const tokenService = new TokenService(db, config.app.encryptionKey);
+
+    // Save encrypted Jira tokens
+    await tokenService.saveJiraTokens(slackUserId, {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresAt: new Date(Date.now() + tokenResponse.expires_in * 1000),
+      scope: tokenResponse.scope,
+      cloudId,
+      siteUrl,
+    });
+
+    // Fetch Jira user info and update user record
+    const jiraService = new JiraService(tokenResponse.access_token, cloudId, siteUrl);
+    const jiraUser = await jiraService.getCurrentUser();
+    await userService.update(slackUserId, { jiraAccountId: jiraUser.accountId });
+
+    res.send('<html><body><h1>Jira connected!</h1><p>You can close this window.</p></body></html>');
   } catch (err) {
     next(err);
   }

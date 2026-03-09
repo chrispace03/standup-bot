@@ -7,3 +7,10 @@ export type {
   CalendarEventReference,
 } from './standup.model';
 export type { ApiErrorResponse, HealthCheckResponse } from './api.model';
+export type {
+  JiraUser,
+  JiraApiIssue,
+  JiraSearchResponse,
+  JiraTokenResponse,
+  JiraCloudResource,
+} from './jira.model';

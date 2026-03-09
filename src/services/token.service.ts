@@ -25,10 +25,10 @@ export class TokenService {
     );
   }
 
-  async saveJiraTokens(slackUserId: string, tokenSet: TokenSet & { cloudId: string }): Promise<void> {
-    const { cloudId, ...rest } = tokenSet;
+  async saveJiraTokens(slackUserId: string, tokenSet: TokenSet & { cloudId: string; siteUrl: string }): Promise<void> {
+    const { cloudId, siteUrl, ...rest } = tokenSet;
     await this.collectionRef.doc(slackUserId).set(
-      { jira: { ...this.encryptTokenSet(rest), cloudId }, updatedAt: Timestamp.now() },
+      { jira: { ...this.encryptTokenSet(rest), cloudId, siteUrl }, updatedAt: Timestamp.now() },
       { merge: true }
     );
   }
@@ -76,6 +76,7 @@ export class TokenService {
       result.jira = {
         ...this.decryptTokenSet(jiraData),
         cloudId: jiraData.cloudId as string,
+        siteUrl: jiraData.siteUrl as string,
       };
     }
     if (data.google) {
