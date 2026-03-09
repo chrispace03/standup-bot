@@ -102,6 +102,10 @@ export function validateConfig(config: Config): string[] {
     console.warn('[CONFIG] ENCRYPTION_KEY not set. Token encryption will not work.');
   }
 
+  if (!config.slack.clientId || !config.slack.clientSecret || !config.slack.signingSecret) {
+    console.warn('[CONFIG] Slack credentials not fully configured. Slack integration will be unavailable.');
+  }
+
   return errors;
 }
 
