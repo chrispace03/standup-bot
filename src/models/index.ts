@@ -14,3 +14,8 @@ export type {
   JiraTokenResponse,
   JiraCloudResource,
 } from './jira.model';
+export type {
+  GoogleTokenResponse,
+  GoogleCalendarEvent,
+  GoogleCalendarEventsResponse,
+} from './google-calendar.model';

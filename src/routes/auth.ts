@@ -7,6 +7,7 @@ import { TeamService } from '../services/team.service';
 import { TokenService } from '../services/token.service';
 import { JiraService } from '../services/jira.service';
 import { buildJiraAuthUrl, exchangeJiraCode, getAccessibleResources } from '../utils/jira-auth.utils';
+import { buildGoogleAuthUrl, exchangeGoogleCode } from '../utils/google-auth.utils';
 
 const router = Router();
 
@@ -156,6 +157,53 @@ router.get('/jira/callback', async (req: Request, res: Response, next: NextFunct
     await userService.update(slackUserId, { jiraAccountId: jiraUser.accountId });
 
     res.send('<html><body><h1>Jira connected!</h1><p>You can close this window.</p></body></html>');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Google OAuth 2.0 ---
+
+router.get('/google', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const slackUserId = req.query.slackUserId as string;
+    if (!slackUserId) throw new AppError('slackUserId query parameter is required', 400);
+
+    const authUrl = buildGoogleAuthUrl(config.google.clientId, config.google.redirectUri, slackUserId);
+    res.redirect(authUrl);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/google/callback', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const code = req.query.code as string;
+    const slackUserId = req.query.state as string;
+    if (!code) throw new AppError('Missing authorization code', 400);
+    if (!slackUserId) throw new AppError('Missing state parameter', 400);
+
+    const tokenResponse = await exchangeGoogleCode(
+      code,
+      config.google.clientId,
+      config.google.clientSecret,
+      config.google.redirectUri
+    );
+
+    const db = getDb();
+    const userService = new UserService(db);
+    const tokenService = new TokenService(db, config.app.encryptionKey);
+
+    await tokenService.saveGoogleTokens(slackUserId, {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token || '',
+      expiresAt: new Date(Date.now() + tokenResponse.expires_in * 1000),
+      scope: tokenResponse.scope,
+    });
+
+    await userService.update(slackUserId, { googleConnected: true });
+
+    res.send('<html><body><h1>Google Calendar connected!</h1><p>You can close this window.</p></body></html>');
   } catch (err) {
     next(err);
   }

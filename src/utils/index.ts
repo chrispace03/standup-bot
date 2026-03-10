@@ -11,3 +11,9 @@ export {
   getAccessibleResources,
   ensureValidToken,
 } from './jira-auth.utils';
+export {
+  buildGoogleAuthUrl,
+  exchangeGoogleCode,
+  refreshGoogleToken,
+  ensureValidGoogleToken,
+} from './google-auth.utils';
