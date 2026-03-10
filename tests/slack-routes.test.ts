@@ -53,8 +53,8 @@ describe('Slack Routes', () => {
       expect(res.body.text).toContain('standup');
     });
 
-    it('responds to /standup-settings command', async () => {
-      const body = 'command=%2Fstandup-settings&user_id=U12345&response_url=https%3A%2F%2Fhooks.slack.com%2Ftest';
+    it('responds to /standup-settings command with 200 (fire-and-forget)', async () => {
+      const body = 'command=%2Fstandup-settings&user_id=U12345&trigger_id=T123&channel_id=C123&response_url=https%3A%2F%2Fhooks.slack.com%2Ftest';
       const timestamp = Math.floor(Date.now() / 1000);
       const signature = signPayload(body, timestamp);
 
@@ -66,11 +66,10 @@ describe('Slack Routes', () => {
         .send(body);
 
       expect(res.status).toBe(200);
-      expect(res.body.text).toContain('Settings');
     });
 
-    it('responds to /standup-connect command', async () => {
-      const body = 'command=%2Fstandup-connect&user_id=U12345&response_url=https%3A%2F%2Fhooks.slack.com%2Ftest';
+    it('responds to /standup-connect command with 200 (fire-and-forget)', async () => {
+      const body = 'command=%2Fstandup-connect&user_id=U12345&channel_id=C123&response_url=https%3A%2F%2Fhooks.slack.com%2Ftest';
       const timestamp = Math.floor(Date.now() / 1000);
       const signature = signPayload(body, timestamp);
 
@@ -82,7 +81,6 @@ describe('Slack Routes', () => {
         .send(body);
 
       expect(res.status).toBe(200);
-      expect(res.body.text).toContain('connections');
     });
 
     it('rejects requests without valid signature', async () => {

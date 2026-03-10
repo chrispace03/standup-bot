@@ -8,6 +8,11 @@ import {
   StandupGeneratorService,
   getSlackService,
 } from '../services';
+import { buildSettingsModal, formatConnectionStatus } from '../utils';
+import {
+  handleSettingsSubmission,
+  handleBlockAction,
+} from '../handlers/slack-interactions';
 
 const router = Router();
 
@@ -16,7 +21,7 @@ router.use(slackVerify);
 
 // Slash commands (Slack sends application/x-www-form-urlencoded)
 router.post('/commands', (req: Request, res: Response) => {
-  const { command, user_id, channel_id } = req.body;
+  const { command, user_id, channel_id, trigger_id } = req.body;
 
   switch (command) {
     case '/standup': {
@@ -44,19 +49,51 @@ router.post('/commands', (req: Request, res: Response) => {
       break;
     }
 
-    case '/standup-settings':
-      res.json({
-        response_type: 'ephemeral',
-        text: `Settings for <@${user_id}>:\n• Standup time: 09:00\n• Days: Mon–Fri\n\n_Settings management coming soon!_`,
-      });
-      break;
+    case '/standup-settings': {
+      // Acknowledge immediately — trigger_id expires in 3s
+      res.status(200).send();
 
-    case '/standup-connect':
-      res.json({
-        response_type: 'ephemeral',
-        text: 'Service connections:\n• Slack: Connected\n• Jira: Not connected\n• Google Calendar: Not connected\n\n_Connection management coming soon!_',
+      (async () => {
+        const db = getDb();
+        const userService = new UserService(db);
+        const user = await userService.getBySlackId(user_id);
+        if (!user) {
+          await getSlackService().postEphemeral(
+            channel_id,
+            user_id,
+            [],
+            'Please set up your account first with /standup-connect',
+          );
+          return;
+        }
+        const modal = buildSettingsModal(user);
+        await getSlackService().openModal(trigger_id, modal);
+      })().catch((err: Error) => {
+        console.error(`[SETTINGS] Modal open failed for ${user_id}:`, err);
       });
       break;
+    }
+
+    case '/standup-connect': {
+      // Acknowledge immediately
+      res.status(200).send();
+
+      (async () => {
+        const db = getDb();
+        const tokenService = new TokenService(db, config.app.encryptionKey);
+        const tokens = await tokenService.getTokens(user_id);
+        const blocks = formatConnectionStatus(tokens, config.app.baseUrl, user_id);
+        await getSlackService().postEphemeral(
+          channel_id,
+          user_id,
+          blocks,
+          'Service connections',
+        );
+      })().catch((err: Error) => {
+        console.error(`[CONNECT] Failed for ${user_id}:`, err);
+      });
+      break;
+    }
 
     default:
       res.json({
@@ -95,7 +132,7 @@ router.post('/events', (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Slack interactive components (buttons, modals)
-router.post('/interactions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/interactions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Slack sends payload as a JSON string in a form-encoded body
     const payload = JSON.parse(req.body.payload || '{}');
@@ -103,14 +140,22 @@ router.post('/interactions', (req: Request, res: Response, next: NextFunction) =
 
     switch (type) {
       case 'block_actions':
-        // Handle button/action clicks — stub for now
+        // Acknowledge immediately, process async
         res.status(200).send();
+        handleBlockAction(payload).catch((err: Error) => {
+          console.error('[INTERACTION] Block action failed:', err);
+        });
         break;
 
-      case 'view_submission':
-        // Handle modal form submissions — stub for now
-        res.json({ response_action: 'clear' });
+      case 'view_submission': {
+        if (payload.view?.callback_id === 'settings_modal') {
+          const result = await handleSettingsSubmission(payload);
+          res.json(result);
+        } else {
+          res.json({ response_action: 'clear' });
+        }
         break;
+      }
 
       default:
         res.status(200).send();

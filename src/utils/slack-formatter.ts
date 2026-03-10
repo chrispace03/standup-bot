@@ -78,6 +78,32 @@ export function formatStandupMessage(
     blocks.push(section(`*Events:*\n${items}`));
   }
 
+  // Action buttons
+  blocks.push({
+    type: 'actions',
+    elements: [
+      {
+        type: 'button',
+        text: { type: 'plain_text', text: 'Regenerate' },
+        action_id: 'regenerate_standup',
+        value: JSON.stringify({ userId: record.userId, date: record.date }),
+      },
+      {
+        type: 'button',
+        text: { type: 'plain_text', text: 'Edit Blockers' },
+        action_id: 'edit_standup',
+        value: JSON.stringify({ userId: record.userId, date: record.date }),
+      },
+      {
+        type: 'button',
+        text: { type: 'plain_text', text: 'Skip Today' },
+        action_id: 'skip_standup',
+        style: 'danger',
+        value: JSON.stringify({ userId: record.userId, date: record.date }),
+      },
+    ],
+  } as KnownBlock);
+
   return blocks;
 }
 
@@ -98,12 +124,16 @@ export function formatSettingsMessage(user: User): KnownBlock[] {
   ];
 }
 
-export function formatConnectionStatus(tokens: UserTokens | null): KnownBlock[] {
+export function formatConnectionStatus(
+  tokens: UserTokens | null,
+  baseUrl?: string,
+  slackUserId?: string,
+): KnownBlock[] {
   const slack = tokens?.slack ? 'Connected' : 'Not connected';
   const jira = tokens?.jira ? 'Connected' : 'Not connected';
   const google = tokens?.google ? 'Connected' : 'Not connected';
 
-  return [
+  const blocks: KnownBlock[] = [
     header('Service Connections'),
     divider(),
     section(
@@ -112,4 +142,26 @@ export function formatConnectionStatus(tokens: UserTokens | null): KnownBlock[] 
       `*Google Calendar:* ${google}`
     ),
   ];
+
+  if (baseUrl && slackUserId) {
+    blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: 'Connect Jira' },
+          url: `${baseUrl}/auth/jira?slackUserId=${slackUserId}`,
+          action_id: 'connect_jira',
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: 'Connect Google Calendar' },
+          url: `${baseUrl}/auth/google?slackUserId=${slackUserId}`,
+          action_id: 'connect_google',
+        },
+      ],
+    } as KnownBlock);
+  }
+
+  return blocks;
 }

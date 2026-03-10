@@ -85,8 +85,8 @@ describe('formatStandupMessage', () => {
     const todayBlock = blocks[3] as { type: string; text: { text: string } };
     expect(todayBlock.text.text).toContain('No planned items');
 
-    // No events section when empty
-    expect(blocks).toHaveLength(5); // header, divider, yesterday, today, blockers
+    // No events section when empty — still has actions block
+    expect(blocks).toHaveLength(6); // header, divider, yesterday, today, blockers, actions
   });
 
   it('includes Jira issue links in markdown format', () => {
@@ -94,6 +94,23 @@ describe('formatStandupMessage', () => {
 
     const yesterdayBlock = blocks[2] as { type: string; text: { text: string } };
     expect(yesterdayBlock.text.text).toContain('<https://jira.example.com/PROJ-1|PROJ-1>');
+  });
+
+  it('includes action buttons (Regenerate, Edit Blockers, Skip Today)', () => {
+    const blocks = formatStandupMessage(baseRecord, 'Chris');
+    const actionsBlock = blocks[blocks.length - 1] as any;
+
+    expect(actionsBlock.type).toBe('actions');
+    expect(actionsBlock.elements).toHaveLength(3);
+    expect(actionsBlock.elements[0].action_id).toBe('regenerate_standup');
+    expect(actionsBlock.elements[1].action_id).toBe('edit_standup');
+    expect(actionsBlock.elements[2].action_id).toBe('skip_standup');
+    expect(actionsBlock.elements[2].style).toBe('danger');
+
+    // Each button carries userId and date context
+    const value = JSON.parse(actionsBlock.elements[0].value);
+    expect(value.userId).toBe('U12345');
+    expect(value.date).toBe('2026-03-09');
   });
 });
 
@@ -154,5 +171,23 @@ describe('formatConnectionStatus', () => {
     const statusBlock = blocks[2] as { type: string; text: { text: string } };
     expect(statusBlock.text.text).toContain('Slack:* Connected');
     expect(statusBlock.text.text).toContain('Jira:* Not connected');
+  });
+
+  it('includes auth URL buttons when baseUrl and slackUserId are provided', () => {
+    const blocks = formatConnectionStatus(null, 'https://example.com', 'U12345');
+    const actionsBlock = blocks[blocks.length - 1] as any;
+
+    expect(actionsBlock.type).toBe('actions');
+    expect(actionsBlock.elements).toHaveLength(2);
+    expect(actionsBlock.elements[0].action_id).toBe('connect_jira');
+    expect(actionsBlock.elements[0].url).toBe('https://example.com/auth/jira?slackUserId=U12345');
+    expect(actionsBlock.elements[1].action_id).toBe('connect_google');
+    expect(actionsBlock.elements[1].url).toBe('https://example.com/auth/google?slackUserId=U12345');
+  });
+
+  it('omits auth buttons when baseUrl is not provided', () => {
+    const blocks = formatConnectionStatus(null);
+
+    expect(blocks).toHaveLength(3); // header, divider, status — no actions
   });
 });
