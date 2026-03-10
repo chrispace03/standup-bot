@@ -4,6 +4,10 @@ import { HealthCheckResponse } from '../models';
 import { AppError } from '../middleware';
 import { UserService } from '../services/user.service';
 import { StandupService } from '../services/standup.service';
+import { TokenService } from '../services/token.service';
+import { StandupGeneratorService } from '../services/standup-generator.service';
+import { StandupSchedulerService } from '../services/standup-scheduler.service';
+import { getSlackService } from '../services/slack.service';
 
 const router = Router();
 
@@ -59,13 +63,48 @@ router.put('/user/:slackId', async (req: Request, res: Response, next: NextFunct
 
 router.post('/standup/trigger', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId } = req.body;
+    const { userId, channelId } = req.body;
     if (!userId) throw new AppError('userId is required', 400);
-    const userService = getUserService();
+
+    const db = getDb();
+    const userService = new UserService(db);
     const user = await userService.getBySlackId(userId);
     if (!user) throw new AppError('User not found', 404);
-    // Actual standup generation comes in Phase 6
-    res.json({ triggered: true, userId, message: 'Standup trigger received' });
+
+    const tokenService = new TokenService(db, config.app.encryptionKey);
+    const standupService = new StandupService(db);
+    const generatorService = new StandupGeneratorService(
+      tokenService, standupService, userService, getSlackService(),
+      config.jira, config.google,
+    );
+
+    const targetChannel = channelId || user.defaultChannelId;
+    const result = await generatorService.generate(userId, targetChannel);
+
+    res.json({
+      triggered: true,
+      userId,
+      date: result.record.date,
+      posted: result.posted,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/scheduler/tick', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const db = getDb();
+    const userService = new UserService(db);
+    const standupService = new StandupService(db);
+    const tokenService = new TokenService(db, config.app.encryptionKey);
+    const generatorService = new StandupGeneratorService(
+      tokenService, standupService, userService, getSlackService(),
+      config.jira, config.google,
+    );
+    const scheduler = new StandupSchedulerService(userService, standupService, generatorService);
+    await scheduler.tick();
+    res.json({ status: 'ok' });
   } catch (err) {
     next(err);
   }

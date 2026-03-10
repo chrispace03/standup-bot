@@ -4,3 +4,7 @@ export { TokenService } from './token.service';
 export { StandupService } from './standup.service';
 export { SlackService, getSlackService } from './slack.service';
 export { JiraService } from './jira.service';
+export { GoogleCalendarService } from './google-calendar.service';
+export { StandupGeneratorService } from './standup-generator.service';
+export type { GenerateResult } from './standup-generator.service';
+export { StandupSchedulerService } from './standup-scheduler.service';

@@ -49,6 +49,13 @@ export class UserService {
     return snapshot.docs.map((doc) => doc.data());
   }
 
+  async getEnabledUsers(): Promise<User[]> {
+    const snapshot = await this.collection
+      .where('standupEnabled', '==', true)
+      .get();
+    return snapshot.docs.map((doc) => doc.data());
+  }
+
   async delete(slackUserId: string): Promise<void> {
     await this.collection.doc(slackUserId).delete();
   }

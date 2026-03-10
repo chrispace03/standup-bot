@@ -1,5 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { config, getDb } from '../config';
 import { slackVerify } from '../middleware/slack-verify';
+import {
+  TokenService,
+  StandupService,
+  UserService,
+  StandupGeneratorService,
+  getSlackService,
+} from '../services';
 
 const router = Router();
 
@@ -8,16 +16,33 @@ router.use(slackVerify);
 
 // Slash commands (Slack sends application/x-www-form-urlencoded)
 router.post('/commands', (req: Request, res: Response) => {
-  const { command, text, user_id, response_url } = req.body;
+  const { command, user_id, channel_id } = req.body;
 
   switch (command) {
-    case '/standup':
-      // Acknowledge immediately — actual generation comes in Phase 6
+    case '/standup': {
       res.json({
         response_type: 'ephemeral',
-        text: `Generating your standup${text ? ` (${text})` : ''}... This feature is coming soon!`,
+        text: 'Generating your standup...',
+      });
+
+      // Fire-and-forget: generate and post asynchronously
+      const db = getDb();
+      const generator = new StandupGeneratorService(
+        new TokenService(db, config.app.encryptionKey),
+        new StandupService(db),
+        new UserService(db),
+        getSlackService(),
+        config.jira,
+        config.google,
+      );
+      generator.generate(user_id, channel_id).catch((err: Error) => {
+        console.error(`[STANDUP] Generation failed for ${user_id}:`, err);
+        getSlackService()
+          .postEphemeral(channel_id, user_id, [], `Standup generation failed: ${err.message}`)
+          .catch((e: unknown) => console.error('[STANDUP] Error notification failed:', e));
       });
       break;
+    }
 
     case '/standup-settings':
       res.json({

@@ -1,5 +1,13 @@
-import { config, validateConfig, initializeFirebase } from './config';
+import { config, validateConfig, initializeFirebase, getDb } from './config';
 import { createApp } from './app';
+import {
+  UserService,
+  StandupService,
+  TokenService,
+  StandupGeneratorService,
+  StandupSchedulerService,
+  getSlackService,
+} from './services';
 
 const configErrors = validateConfig(config);
 if (configErrors.length > 0) {
@@ -23,4 +31,22 @@ app.listen(port, () => {
   console.log(`[SERVER] Standup Bot API running on port ${port}`);
   console.log(`[SERVER] Environment: ${config.app.nodeEnv}`);
   console.log(`[SERVER] Health check: http://localhost:${port}/api/health`);
+
+  // Start scheduler in non-test environments
+  if (config.app.nodeEnv !== 'test') {
+    try {
+      const db = getDb();
+      const userService = new UserService(db);
+      const standupService = new StandupService(db);
+      const tokenService = new TokenService(db, config.app.encryptionKey);
+      const generatorService = new StandupGeneratorService(
+        tokenService, standupService, userService, getSlackService(),
+        config.jira, config.google,
+      );
+      const scheduler = new StandupSchedulerService(userService, standupService, generatorService);
+      scheduler.start();
+    } catch (err) {
+      console.warn('[SERVER] Could not start scheduler:', (err as Error).message);
+    }
+  }
 });
