@@ -124,6 +124,100 @@ export function formatSettingsMessage(user: User): KnownBlock[] {
   ];
 }
 
+export function formatStandupHistory(
+  records: StandupRecord[],
+  displayName: string,
+): KnownBlock[] {
+  if (records.length === 0) {
+    return [
+      header('Standup History'),
+      divider(),
+      section('_No standups found. Use /standup to generate your first one._'),
+    ];
+  }
+
+  const blocks: KnownBlock[] = [
+    header(`${displayName}'s Standup History`),
+    divider(),
+  ];
+
+  for (const record of records) {
+    const yesterdayCount = record.yesterday.length;
+    const todayCount = record.today.length;
+    const eventCount = record.events.length;
+    const hasBlockers = record.blockers && record.blockers !== 'None';
+
+    let summary = `*${formatDate(record.date)}*\n`;
+    summary += `  ${yesterdayCount} completed | ${todayCount} planned | ${eventCount} events`;
+    if (hasBlockers) {
+      summary += ' | :warning: blockers';
+    }
+
+    blocks.push(section(summary));
+  }
+
+  blocks.push(divider());
+  blocks.push(
+    section(`_Showing ${records.length} most recent standup${records.length === 1 ? '' : 's'}_`),
+  );
+
+  return blocks;
+}
+
+export function formatWeeklySummary(
+  records: StandupRecord[],
+  displayName: string,
+  weekStart: string,
+  weekEnd: string,
+  aiSummary?: string | null,
+): KnownBlock[] {
+  if (records.length === 0) {
+    return [
+      header('Weekly Summary'),
+      divider(),
+      section(`_No standups recorded for ${formatDate(weekStart)} – ${formatDate(weekEnd)}._`),
+    ];
+  }
+
+  const totalCompleted = records.reduce((sum, r) => sum + r.yesterday.length, 0);
+  const totalPlanned = records.reduce((sum, r) => sum + r.today.length, 0);
+  const totalEvents = records.reduce((sum, r) => sum + r.events.length, 0);
+  const daysWithBlockers = records.filter(
+    (r) => r.blockers && r.blockers !== 'None',
+  ).length;
+
+  const blocks: KnownBlock[] = [
+    header(`${displayName}'s Weekly Summary`),
+    section(`_${formatDate(weekStart)} – ${formatDate(weekEnd)}_`),
+    divider(),
+    section(
+      `*Standups completed:* ${records.length}\n` +
+      `*Issues completed:* ${totalCompleted}\n` +
+      `*Issues planned:* ${totalPlanned}\n` +
+      `*Meetings attended:* ${totalEvents}\n` +
+      `*Days with blockers:* ${daysWithBlockers}`,
+    ),
+  ];
+
+  const blockerDays = records.filter(
+    (r) => r.blockers && r.blockers !== 'None',
+  );
+  if (blockerDays.length > 0) {
+    const blockerLines = blockerDays
+      .map((r) => `  • *${formatDate(r.date)}:* ${r.blockers}`)
+      .join('\n');
+    blocks.push(divider());
+    blocks.push(section(`*Blockers this week:*\n${blockerLines}`));
+  }
+
+  if (aiSummary) {
+    blocks.push(divider());
+    blocks.push(section(`*AI Analysis:*\n${aiSummary}`));
+  }
+
+  return blocks;
+}
+
 export function formatConnectionStatus(
   tokens: UserTokens | null,
   baseUrl?: string,

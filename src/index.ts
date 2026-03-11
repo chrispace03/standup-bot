@@ -7,6 +7,7 @@ import {
   StandupGeneratorService,
   StandupSchedulerService,
   getSlackService,
+  AIService,
 } from './services';
 
 const configErrors = validateConfig(config);
@@ -43,7 +44,8 @@ app.listen(port, () => {
         tokenService, standupService, userService, getSlackService(),
         config.jira, config.google,
       );
-      const scheduler = new StandupSchedulerService(userService, standupService, generatorService);
+      const aiService = new AIService(config.app.anthropicApiKey);
+      const scheduler = new StandupSchedulerService(userService, standupService, generatorService, getSlackService(), aiService);
       scheduler.start();
     } catch (err) {
       console.warn('[SERVER] Could not start scheduler:', (err as Error).message);

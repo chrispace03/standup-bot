@@ -1,6 +1,8 @@
 import {
   formatStandupMessage,
   formatSettingsMessage,
+  formatStandupHistory,
+  formatWeeklySummary,
   formatConnectionStatus,
 } from '../src/utils/slack-formatter';
 import { StandupRecord, User, UserTokens } from '../src/models';
@@ -142,6 +144,143 @@ describe('formatSettingsMessage', () => {
     expect(settingsBlock.text.text).toContain('Mon, Tue, Wed, Thu, Fri');
     expect(settingsBlock.text.text).toContain('Yes');
     expect(settingsBlock.text.text).toContain('Australia/Sydney');
+  });
+});
+
+describe('formatStandupHistory', () => {
+  const records: StandupRecord[] = [
+    {
+      userId: 'U12345',
+      date: '2026-03-12',
+      yesterday: [
+        { issueKey: 'P-1', summary: 'Task A', status: 'Done', issueType: 'Story', url: '' },
+      ],
+      today: [
+        { issueKey: 'P-2', summary: 'Task B', status: 'In Progress', issueType: 'Story', url: '' },
+        { issueKey: 'P-3', summary: 'Task C', status: 'To Do', issueType: 'Bug', url: '' },
+      ],
+      blockers: 'None',
+      events: [
+        { eventId: 'e1', title: 'Standup', startTime: new Date(), endTime: new Date(), isAllDay: false },
+      ],
+    },
+    {
+      userId: 'U12345',
+      date: '2026-03-11',
+      yesterday: [],
+      today: [
+        { issueKey: 'P-4', summary: 'Task D', status: 'In Progress', issueType: 'Story', url: '' },
+      ],
+      blockers: 'Waiting on API access',
+      events: [],
+    },
+  ];
+
+  it('shows header and summary for each record', () => {
+    const blocks = formatStandupHistory(records, 'Chris');
+
+    expect(blocks[0]).toEqual({
+      type: 'header',
+      text: { type: 'plain_text', text: "Chris's Standup History", emoji: true },
+    });
+    expect(blocks[1]).toEqual({ type: 'divider' });
+
+    // First record summary
+    const first = blocks[2] as any;
+    expect(first.text.text).toContain('1 completed');
+    expect(first.text.text).toContain('2 planned');
+    expect(first.text.text).toContain('1 events');
+
+    // Second record with blockers
+    const second = blocks[3] as any;
+    expect(second.text.text).toContain('0 completed');
+    expect(second.text.text).toContain(':warning: blockers');
+  });
+
+  it('shows footer with record count', () => {
+    const blocks = formatStandupHistory(records, 'Chris');
+    const footer = blocks[blocks.length - 1] as any;
+
+    expect(footer.text.text).toContain('Showing 2 most recent standups');
+  });
+
+  it('shows empty state when no records', () => {
+    const blocks = formatStandupHistory([], 'Chris');
+
+    expect(blocks).toHaveLength(3); // header, divider, empty message
+    const msg = blocks[2] as any;
+    expect(msg.text.text).toContain('No standups found');
+  });
+
+  it('uses singular for single record', () => {
+    const blocks = formatStandupHistory([records[0]], 'Chris');
+    const footer = blocks[blocks.length - 1] as any;
+
+    expect(footer.text.text).toContain('1 most recent standup');
+    expect(footer.text.text).not.toContain('standups');
+  });
+});
+
+describe('formatWeeklySummary', () => {
+  const weekRecords: StandupRecord[] = [
+    {
+      userId: 'U12345', date: '2026-03-09',
+      yesterday: [{ issueKey: 'P-1', summary: 'A', status: 'Done', issueType: 'Story', url: '' }],
+      today: [{ issueKey: 'P-2', summary: 'B', status: 'In Progress', issueType: 'Story', url: '' }],
+      blockers: 'None',
+      events: [{ eventId: 'e1', title: 'Standup', startTime: new Date(), endTime: new Date(), isAllDay: false }],
+    },
+    {
+      userId: 'U12345', date: '2026-03-10',
+      yesterday: [{ issueKey: 'P-3', summary: 'C', status: 'Done', issueType: 'Bug', url: '' }],
+      today: [],
+      blockers: 'Waiting on deploy',
+      events: [],
+    },
+  ];
+
+  it('shows summary stats for the week', () => {
+    const blocks = formatWeeklySummary(weekRecords, 'Chris', '2026-03-09', '2026-03-13');
+    const statsBlock = blocks[3] as any;
+
+    expect(statsBlock.text.text).toContain('Standups completed:* 2');
+    expect(statsBlock.text.text).toContain('Issues completed:* 2');
+    expect(statsBlock.text.text).toContain('Issues planned:* 1');
+    expect(statsBlock.text.text).toContain('Meetings attended:* 1');
+    expect(statsBlock.text.text).toContain('Days with blockers:* 1');
+  });
+
+  it('lists blocker details when present', () => {
+    const blocks = formatWeeklySummary(weekRecords, 'Chris', '2026-03-09', '2026-03-13');
+    const allText = blocks.map((b: any) => b.text?.text || '').join('\n');
+
+    expect(allText).toContain('Waiting on deploy');
+  });
+
+  it('shows empty state when no records', () => {
+    const blocks = formatWeeklySummary([], 'Chris', '2026-03-09', '2026-03-13');
+
+    expect(blocks).toHaveLength(3);
+    const msg = blocks[2] as any;
+    expect(msg.text.text).toContain('No standups recorded');
+  });
+
+  it('includes AI analysis section when aiSummary is provided', () => {
+    const blocks = formatWeeklySummary(
+      weekRecords, 'Chris', '2026-03-09', '2026-03-13',
+      'Deploy dependency is a recurring theme. Consider escalating to DevOps.',
+    );
+    const allText = blocks.map((b: any) => b.text?.text || '').join('\n');
+
+    expect(allText).toContain('AI Analysis');
+    expect(allText).toContain('Deploy dependency is a recurring theme');
+  });
+
+  it('omits AI analysis section when aiSummary is null', () => {
+    const blocks = formatWeeklySummary(weekRecords, 'Chris', '2026-03-09', '2026-03-13', null);
+    const allText = blocks.map((b: any) => b.text?.text || '').join('\n');
+
+    expect(allText).not.toContain('AI Analysis');
   });
 });
 

@@ -2,11 +2,32 @@ import cron, { ScheduledTask } from 'node-cron';
 import { UserService } from './user.service';
 import { StandupService } from './standup.service';
 import { StandupGeneratorService } from './standup-generator.service';
+import { SlackService } from './slack.service';
+import { AIService } from './ai.service';
+import { formatWeeklySummary } from '../utils/slack-formatter';
 
 interface TimezoneInfo {
   time: string;       // "HH:MM"
   dayOfWeek: number;  // 0=Sun, 6=Sat
   dateStr: string;    // "YYYY-MM-DD"
+}
+
+export function getReminderTime(standupTime: string): string {
+  const [h, m] = standupTime.split(':').map(Number);
+  const totalMinutes = h * 60 + m - 15;
+  if (totalMinutes < 0) {
+    const wrapped = totalMinutes + 24 * 60;
+    return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+  }
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+}
+
+export function getWeekStartDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay(); // 0=Sun
+  const diff = day === 0 ? 6 : day - 1; // Monday = 0 offset
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d.toISOString().slice(0, 10);
 }
 
 export class StandupSchedulerService {
@@ -16,6 +37,8 @@ export class StandupSchedulerService {
     private userService: UserService,
     private standupService: StandupService,
     private generatorService: StandupGeneratorService,
+    private slackService?: SlackService,
+    private aiService?: AIService,
   ) {}
 
   start(): void {
@@ -39,15 +62,32 @@ export class StandupSchedulerService {
     const users = await this.userService.getEnabledUsers();
 
     let triggered = 0;
+    let reminders = 0;
     let errors = 0;
 
     for (const user of users) {
       try {
         const { time, dayOfWeek, dateStr } = this.getCurrentTimeInTimezone(user.timezone, now);
 
-        // Check if it's time for this user's standup
-        if (time !== user.standupTime) continue;
+        // Skip if not a standup day
         if (!user.standupDays.includes(dayOfWeek)) continue;
+
+        // Check for reminder (15 min before standup)
+        const reminderTime = getReminderTime(user.standupTime);
+        if (time === reminderTime && this.slackService) {
+          const existing = await this.standupService.getById(dateStr, user.slackUserId);
+          if (!existing) {
+            await this.slackService.postMessage(
+              user.slackUserId,
+              [],
+              `Heads up! Your standup is in 15 minutes (${user.standupTime}). Use /standup if you'd like to generate it early.`,
+            );
+            reminders++;
+          }
+        }
+
+        // Check if it's time for standup generation
+        if (time !== user.standupTime) continue;
 
         // Dedup: skip if standup already exists for today
         const existing = await this.standupService.getById(dateStr, user.slackUserId);
@@ -61,6 +101,34 @@ export class StandupSchedulerService {
         );
         triggered++;
         console.log(`[SCHEDULER] Triggered standup for ${user.slackUserId}`);
+
+        // Weekly summary: send on the last standup day of the week
+        const lastStandupDay = Math.max(...user.standupDays);
+        if (dayOfWeek === lastStandupDay && this.slackService) {
+          const weekStart = getWeekStartDate(dateStr);
+          const records = await this.standupService.getByDateRange(
+            user.slackUserId, weekStart, dateStr,
+          );
+
+          // AI blocker analysis
+          let aiSummary: string | null = null;
+          if (this.aiService?.isConfigured) {
+            const blockerEntries = records
+              .filter((r) => r.blockers && r.blockers !== 'None')
+              .map((r) => ({ date: r.date, text: r.blockers }));
+            try {
+              aiSummary = await this.aiService.summarizeBlockers(blockerEntries);
+            } catch (err) {
+              console.warn(`[SCHEDULER] AI summary failed for ${user.slackUserId}:`, err);
+            }
+          }
+
+          const blocks = formatWeeklySummary(
+            records, user.displayName, weekStart, dateStr, aiSummary,
+          );
+          const channel = user.defaultChannelId || user.slackUserId;
+          await this.slackService.postMessage(channel, blocks, 'Weekly standup summary');
+        }
       } catch (err) {
         errors++;
         console.error(`[SCHEDULER] Failed for ${user.slackUserId}:`, err);
@@ -68,7 +136,7 @@ export class StandupSchedulerService {
     }
 
     if (users.length > 0) {
-      console.log(`[SCHEDULER] Tick complete: ${users.length} checked, ${triggered} triggered, ${errors} errors`);
+      console.log(`[SCHEDULER] Tick complete: ${users.length} checked, ${triggered} triggered, ${reminders} reminders, ${errors} errors`);
     }
   }
 

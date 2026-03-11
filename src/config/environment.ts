@@ -8,6 +8,7 @@ export interface AppConfig {
   port: number;
   baseUrl: string;
   encryptionKey: string;
+  anthropicApiKey: string;
 }
 
 export interface SlackConfig {
@@ -57,6 +58,7 @@ function buildConfig(): Config {
       port: parseInt(getEnv('PORT', '3000'), 10),
       baseUrl: getEnv('BASE_URL', 'http://localhost:3000'),
       encryptionKey: getEnv('ENCRYPTION_KEY'),
+      anthropicApiKey: getEnv('ANTHROPIC_API_KEY'),
     },
     slack: {
       clientId: getEnv('SLACK_CLIENT_ID'),

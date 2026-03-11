@@ -2,6 +2,8 @@ export { encrypt, decrypt } from './encryption';
 export {
   formatStandupMessage,
   formatSettingsMessage,
+  formatStandupHistory,
+  formatWeeklySummary,
   formatConnectionStatus,
 } from './slack-formatter';
 export {

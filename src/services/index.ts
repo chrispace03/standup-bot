@@ -7,4 +7,6 @@ export { JiraService } from './jira.service';
 export { GoogleCalendarService } from './google-calendar.service';
 export { StandupGeneratorService } from './standup-generator.service';
 export type { GenerateResult } from './standup-generator.service';
-export { StandupSchedulerService } from './standup-scheduler.service';
+export { StandupSchedulerService, getReminderTime, getWeekStartDate } from './standup-scheduler.service';
+export { AIService } from './ai.service';
+export type { BlockerEntry } from './ai.service';

@@ -8,7 +8,7 @@ import {
   StandupGeneratorService,
   getSlackService,
 } from '../services';
-import { buildSettingsModal, formatConnectionStatus } from '../utils';
+import { buildSettingsModal, formatConnectionStatus, formatStandupHistory } from '../utils';
 import {
   handleSettingsSubmission,
   handleBlockAction,
@@ -70,6 +70,29 @@ router.post('/commands', (req: Request, res: Response) => {
         await getSlackService().openModal(trigger_id, modal);
       })().catch((err: Error) => {
         console.error(`[SETTINGS] Modal open failed for ${user_id}:`, err);
+      });
+      break;
+    }
+
+    case '/standup-history': {
+      res.status(200).send();
+
+      (async () => {
+        const db = getDb();
+        const userService = new UserService(db);
+        const standupService = new StandupService(db);
+        const user = await userService.getBySlackId(user_id);
+        const displayName = user?.displayName || 'Your';
+        const records = await standupService.getHistory(user_id);
+        const blocks = formatStandupHistory(records, displayName);
+        await getSlackService().postEphemeral(
+          channel_id,
+          user_id,
+          blocks,
+          'Standup history',
+        );
+      })().catch((err: Error) => {
+        console.error(`[HISTORY] Failed for ${user_id}:`, err);
       });
       break;
     }

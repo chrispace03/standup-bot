@@ -60,6 +60,16 @@ export class StandupService {
     return snapshot.docs.map((doc) => doc.data());
   }
 
+  async getByDateRange(userId: string, startDate: string, endDate: string): Promise<StandupRecord[]> {
+    const snapshot = await this.collection
+      .where('userId', '==', userId)
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
+      .orderBy('date', 'asc')
+      .get();
+    return snapshot.docs.map((doc) => doc.data());
+  }
+
   async delete(date: string, userId: string): Promise<void> {
     await this.collection.doc(`${date}_${userId}`).delete();
   }
