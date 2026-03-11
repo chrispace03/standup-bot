@@ -1,5 +1,7 @@
 # Smart Daily Standup Bot
 
+![CI](https://github.com/chrispace03/standup-bot/actions/workflows/ci.yml/badge.svg)
+
 A Slack bot that automates Agile standups by pulling data from Jira and Google Calendar, then posting formatted daily standup messages.
 
 Built as a portfolio project and to explore interest in project management software.
@@ -39,11 +41,12 @@ Built as a portfolio project and to explore interest in project management softw
 | Express.js 5 | Web framework |
 | Firebase Firestore | Database (serverless) |
 | Firebase Functions | Hosting (serverless) |
-| Slack API | Bot interactions, slash commands |
+| Slack API | Bot interactions, slash commands, Block Kit modals |
 | Jira Cloud REST API | Issue tracking data |
 | Google Calendar API | Calendar events |
 | OAuth 2.0 | Authentication for all services |
 | Jest + Supertest | Testing |
+| ESLint | Linting (flat config + typescript-eslint) |
 | GitHub Actions | CI/CD |
 
 ## Project Structure
@@ -51,11 +54,13 @@ Built as a portfolio project and to explore interest in project management softw
 ```
 src/
 ├── config/          # Environment config, Firebase init
-├── middleware/       # Error handling, logging, 404
+├── handlers/        # Slack interaction handlers
+├── middleware/       # Error handling, logging, Slack verification, 404
 ├── models/          # TypeScript interfaces for all data
-├── routes/          # Express route handlers
+├── routes/          # Express route handlers (auth, slack, api)
 ├── services/        # Business logic & Firestore CRUD
-├── utils/           # Helpers (encryption, formatters)
+├── types/           # Express type augmentations
+├── utils/           # Helpers (encryption, formatters, modals, OAuth)
 ├── app.ts           # Express app factory
 └── index.ts         # Server entry point
 tests/
@@ -69,7 +74,7 @@ tests/
 
 - Node.js 18+
 - A Firebase project with Firestore enabled
-- (Later phases) Slack, Jira, and Google API credentials
+- Slack, Jira, and Google API credentials
 
 ### Installation
 
@@ -100,6 +105,12 @@ npm start
 
 # Development (watch mode)
 npm run dev
+
+# Lint
+npm run lint
+
+# Type check
+npm run typecheck
 ```
 
 The server starts at `http://localhost:3000`. Check it's running:
@@ -111,7 +122,14 @@ curl http://localhost:3000/api/health
 ### Testing
 
 ```bash
+# Run tests
 npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 ```
 
 ## API Endpoints
@@ -122,17 +140,24 @@ npm test
 | GET | `/api/user/:slackId` | Get user profile & settings |
 | PUT | `/api/user/:slackId` | Update user settings |
 | POST | `/api/standup/trigger` | Trigger standup generation |
-| GET | `/api/standup/history` | Get standup history |
-
-### Planned endpoints (upcoming phases):
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| POST | `/api/scheduler/tick` | Trigger scheduler tick (for external schedulers) |
 | GET | `/auth/slack` | Initiate Slack OAuth |
+| GET | `/auth/slack/callback` | Slack OAuth callback |
 | GET | `/auth/jira` | Initiate Jira OAuth |
+| GET | `/auth/jira/callback` | Jira OAuth callback |
 | GET | `/auth/google` | Initiate Google OAuth |
-| POST | `/slack/events` | Slack event subscriptions |
+| GET | `/auth/google/callback` | Google OAuth callback |
 | POST | `/slack/commands` | Slash command handler |
+| POST | `/slack/events` | Slack event subscriptions |
 | POST | `/slack/interactions` | Button/modal interactions |
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/standup` | Generate and post your standup |
+| `/standup-settings` | Open settings modal (timezone, time, days, channel) |
+| `/standup-connect` | View service connection status with auth links |
 
 ## Database Schema (Firestore)
 
@@ -161,6 +186,8 @@ standups/{date}_{userId}  — Historical standup records
 📅 Events:
   • 10:00 - Team Standup
   • 14:00 - Sprint Planning
+
+[Regenerate] [Edit Blockers] [Skip Today]
 ```
 
 ## Security
@@ -169,7 +196,7 @@ standups/{date}_{userId}  — Historical standup records
 - Helmet.js for HTTP security headers
 - CORS configured for API access
 - Error messages masked in production (no stack traces leaked)
-- Slack request signing verification (upcoming)
+- Slack request signing verification on all Slack routes
 
 ## Environment Variables
 

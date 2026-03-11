@@ -13,6 +13,7 @@ export interface ViewSubmissionPayload {
     callback_id: string;
     private_metadata: string;
     state: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       values: Record<string, Record<string, any>>;
     };
   };
