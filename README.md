@@ -2,9 +2,21 @@
 
 ![CI](https://github.com/chrispace03/standup-bot/actions/workflows/ci.yml/badge.svg)
 
-A Slack bot that automates Agile standups by pulling data from Jira and Google Calendar, then posting formatted daily standup messages.
+A Slack bot that automates Agile standups by pulling data from Jira and Google Calendar, then posting formatted daily standup messages. Includes scheduled reminders, weekly summaries, and AI-powered blocker analysis.
 
 Built as a portfolio project and to explore interest in project management software.
+
+## Features
+
+- **Automated standups** — pulls yesterday's completed issues, today's sprint items, and calendar events from Jira and Google Calendar
+- **Scheduled delivery** — cron-based scheduler triggers standups at each user's configured time and timezone
+- **Pre-standup reminders** — DM reminder 15 minutes before standup time
+- **Weekly summaries** — aggregated stats (issues completed/planned, meetings, blocker days) sent on the last standup day of the week
+- **AI blocker analysis** — Claude API summarizes recurring blocker patterns in weekly summaries (optional, gracefully degrades without API key)
+- **Standup history** — browse recent standups via `/standup-history`
+- **Interactive messages** — Regenerate, Edit Blockers, and Skip buttons on every standup
+- **Settings modal** — configure timezone, standup time, active days, and target channel via `/standup-settings`
+- **Multi-service OAuth** — connect Slack, Jira, and Google Calendar with encrypted token storage
 
 ## Architecture
 
@@ -23,7 +35,7 @@ Built as a portfolio project and to explore interest in project management softw
 │  │ Slack Service│  │ Jira Service │  │ Calendar Service     │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Scheduler    │  │ Auth (OAuth) │  │ User Preferences     │  │
+│  │ Scheduler    │  │ Auth (OAuth) │  │ AI Service (Claude)  │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
           │                │                      │
@@ -31,6 +43,12 @@ Built as a portfolio project and to explore interest in project management softw
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────────┐
 │   Slack API     │ │   Jira Cloud    │ │   Google Calendar API   │
 └─────────────────┘ └─────────────────┘ └─────────────────────────┘
+                           │
+                    ┌──────┘
+                    ▼
+          ┌─────────────────┐
+          │  Anthropic API  │
+          └─────────────────┘
 ```
 
 ## Tech Stack
@@ -44,28 +62,30 @@ Built as a portfolio project and to explore interest in project management softw
 | Slack API | Bot interactions, slash commands, Block Kit modals |
 | Jira Cloud REST API | Issue tracking data |
 | Google Calendar API | Calendar events |
+| Claude API | AI-powered blocker analysis (via `@anthropic-ai/sdk`) |
 | OAuth 2.0 | Authentication for all services |
-| Jest + Supertest | Testing |
+| node-cron | Per-user standup scheduling |
+| Jest + Supertest | Testing (169 tests across 19 suites) |
 | ESLint | Linting (flat config + typescript-eslint) |
-| GitHub Actions | CI/CD |
+| GitHub Actions | CI/CD (Node 18 + 20 matrix) |
 
 ## Project Structure
 
 ```
 src/
 ├── config/          # Environment config, Firebase init
-├── handlers/        # Slack interaction handlers
+├── handlers/        # Slack interaction handlers (settings, buttons)
 ├── middleware/       # Error handling, logging, Slack verification, 404
-├── models/          # TypeScript interfaces for all data
+├── models/          # TypeScript interfaces (User, Standup, Token, Team, etc.)
 ├── routes/          # Express route handlers (auth, slack, api)
-├── services/        # Business logic & Firestore CRUD
+├── services/        # Business logic (Jira, Google, Slack, AI, Scheduler)
 ├── types/           # Express type augmentations
-├── utils/           # Helpers (encryption, formatters, modals, OAuth)
+├── utils/           # Encryption, formatters, modals, OAuth helpers
 ├── app.ts           # Express app factory
 └── index.ts         # Server entry point
 tests/
 ├── helpers/         # Test utilities (Firestore mocks)
-└── *.test.ts        # Unit & integration tests
+└── *.test.ts        # Unit & integration tests (19 suites)
 ```
 
 ## Getting Started
@@ -75,6 +95,7 @@ tests/
 - Node.js 18+
 - A Firebase project with Firestore enabled
 - Slack, Jira, and Google API credentials
+- Anthropic API key (optional, for AI blocker summaries)
 
 ### Installation
 
@@ -92,7 +113,7 @@ Copy the example env file and fill in your values:
 cp .env.example .env
 ```
 
-The server runs without Firebase credentials (database routes return 503), so you can start developing immediately.
+The server runs without Firebase credentials (database routes return 503), so you can start developing immediately. The AI blocker summary feature is also optional — it activates only when `ANTHROPIC_API_KEY` is set.
 
 ### Running
 
@@ -140,6 +161,7 @@ npm run test:coverage
 | GET | `/api/user/:slackId` | Get user profile & settings |
 | PUT | `/api/user/:slackId` | Update user settings |
 | POST | `/api/standup/trigger` | Trigger standup generation |
+| GET | `/api/standup/history` | Get standup history for a user |
 | POST | `/api/scheduler/tick` | Trigger scheduler tick (for external schedulers) |
 | GET | `/auth/slack` | Initiate Slack OAuth |
 | GET | `/auth/slack/callback` | Slack OAuth callback |
@@ -158,6 +180,17 @@ npm run test:coverage
 | `/standup` | Generate and post your standup |
 | `/standup-settings` | Open settings modal (timezone, time, days, channel) |
 | `/standup-connect` | View service connection status with auth links |
+| `/standup-history` | Browse your recent standup history |
+
+## Scheduler
+
+The built-in scheduler runs every minute and handles:
+
+1. **Standup generation** — triggers at each user's configured time in their timezone
+2. **Reminders** — sends a DM 15 minutes before standup time
+3. **Weekly summaries** — on the user's last standup day of the week, posts aggregated stats
+4. **AI analysis** — if configured, Claude analyzes the week's blockers for patterns and escalation needs
+5. **Deduplication** — skips if a standup already exists for the day
 
 ## Database Schema (Firestore)
 
@@ -171,23 +204,43 @@ standups/{date}_{userId}  — Historical standup records
 ## Standup Message Format
 
 ```
-👤 Chris's Standup - Mon 10 Mar
+Chris's Standup - Mon 10 Mar
 ─────────────────────────────────
-✅ Yesterday:
+Yesterday:
   • PROJ-123: Fix login bug
   • PROJ-124: Update docs
 
-🚀 Today:
+Today:
   • PROJ-125: Build API endpoint
   • PROJ-126: Code review
 
-🚧 Blockers: None
+Blockers: None
 
-📅 Events:
+Events:
   • 10:00 - Team Standup
   • 14:00 - Sprint Planning
 
 [Regenerate] [Edit Blockers] [Skip Today]
+```
+
+## Weekly Summary Format
+
+```
+Chris's Weekly Summary
+Mon 9 Mar – Fri 13 Mar
+─────────────────────────────────
+Standups completed: 5
+Issues completed: 12
+Issues planned: 8
+Meetings attended: 6
+Days with blockers: 1
+
+Blockers this week:
+  • Tue 10 Mar: Waiting on API access
+
+AI Analysis:
+The only blocker this week was an external dependency on API access.
+Consider following up with the platform team to prevent recurrence.
 ```
 
 ## Security
@@ -206,6 +259,7 @@ See [`.env.example`](.env.example) for the full list. Key groups:
 - **Slack**: `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
 - **Jira**: `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_REDIRECT_URI`
 - **Google**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+- **Anthropic**: `ANTHROPIC_API_KEY` (optional — enables AI blocker analysis in weekly summaries)
 - **Firebase**: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`
 
 ## License
