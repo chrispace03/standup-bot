@@ -4,6 +4,7 @@ import { StandupService } from '../services/standup.service';
 import { TokenService } from '../services/token.service';
 import { StandupGeneratorService } from '../services/standup-generator.service';
 import { getSlackService } from '../services/slack.service';
+import { formatStandupMessage } from '../utils/slack-formatter';
 
 // Minimal Slack payload types
 export interface ViewSubmissionPayload {
@@ -21,8 +22,10 @@ export interface ViewSubmissionPayload {
 
 export interface BlockActionsPayload {
   type: 'block_actions';
+  trigger_id: string;
   user: { id: string };
   channel?: { id: string };
+  message?: { ts: string };
   actions: Array<{ action_id: string; value?: string }>;
 }
 
@@ -103,16 +106,45 @@ export async function handleBlockAction(
     }
 
     case 'edit_standup': {
-      // Edit modal will be implemented in a future phase
-      const channelId = payload.channel?.id;
-      if (!channelId) break;
+      const context = action.value ? JSON.parse(action.value) : {};
+      const userId = context.userId || payload.user.id;
+      const date = context.date;
+      if (!date) break;
 
-      await getSlackService().postEphemeral(
-        channelId,
-        payload.user.id,
-        [],
-        'Edit standup coming soon!',
-      );
+      const db = getDb();
+      const standupService = new StandupService(db);
+      const record = await standupService.getById(date, userId);
+      const currentBlockers = record?.blockers || '';
+
+      const modal = {
+        type: 'modal',
+        callback_id: 'edit_blockers_modal',
+        private_metadata: JSON.stringify({
+          userId,
+          date,
+          channelId: payload.channel?.id,
+          messageTs: payload.message?.ts,
+        }),
+        title: { type: 'plain_text', text: 'Edit Blockers' },
+        submit: { type: 'plain_text', text: 'Save' },
+        close: { type: 'plain_text', text: 'Cancel' },
+        blocks: [
+          {
+            type: 'input',
+            block_id: 'blockers_block',
+            label: { type: 'plain_text', text: 'Blockers' },
+            element: {
+              type: 'plain_text_input',
+              action_id: 'blockers_input',
+              multiline: true,
+              initial_value: currentBlockers === 'None' ? '' : currentBlockers,
+              placeholder: { type: 'plain_text', text: 'Describe any blockers, or leave empty for "None"' },
+            },
+          },
+        ],
+      };
+
+      await getSlackService().openModal(payload.trigger_id, modal);
       break;
     }
 
@@ -120,4 +152,34 @@ export async function handleBlockAction(
     default:
       break;
   }
+}
+
+export async function handleEditBlockersSubmission(
+  payload: ViewSubmissionPayload,
+): Promise<Record<string, unknown>> {
+  const values = payload.view.state.values;
+  const meta = JSON.parse(payload.view.private_metadata);
+  const { userId, date, channelId, messageTs } = meta;
+
+  const newBlockers = values.blockers_block.blockers_input.value?.trim() || 'None';
+
+  const db = getDb();
+  const standupService = new StandupService(db);
+  const record = await standupService.getById(date, userId);
+
+  if (record) {
+    record.blockers = newBlockers;
+    await standupService.save(record);
+
+    // Update the original Slack message if we have the context
+    if (channelId && messageTs) {
+      const userService = new UserService(db);
+      const user = await userService.getBySlackId(userId);
+      const displayName = user?.displayName || 'Your';
+      const blocks = formatStandupMessage(record, displayName);
+      await getSlackService().updateMessage(channelId, messageTs, blocks, `${displayName}'s Standup`);
+    }
+  }
+
+  return {}; // empty response closes modal
 }

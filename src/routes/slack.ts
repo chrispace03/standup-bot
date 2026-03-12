@@ -12,6 +12,7 @@ import { buildSettingsModal, formatConnectionStatus, formatStandupHistory } from
 import {
   handleSettingsSubmission,
   handleBlockAction,
+  handleEditBlockersSubmission,
 } from '../handlers/slack-interactions';
 
 const router = Router();
@@ -173,6 +174,9 @@ router.post('/interactions', async (req: Request, res: Response, next: NextFunct
       case 'view_submission': {
         if (payload.view?.callback_id === 'settings_modal') {
           const result = await handleSettingsSubmission(payload);
+          res.json(result);
+        } else if (payload.view?.callback_id === 'edit_blockers_modal') {
+          const result = await handleEditBlockersSubmission(payload);
           res.json(result);
         } else {
           res.json({ response_action: 'clear' });

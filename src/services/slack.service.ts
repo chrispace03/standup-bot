@@ -29,6 +29,15 @@ export class SlackService {
   async openModal(triggerId: string, view: Record<string, unknown>): Promise<void> {
     await this.client.views.open({ trigger_id: triggerId, view: view as never });
   }
+
+  async updateMessage(
+    channel: string,
+    ts: string,
+    blocks: KnownBlock[],
+    text: string,
+  ): Promise<void> {
+    await this.client.chat.update({ channel, ts, blocks, text });
+  }
 }
 
 export function getSlackService(): SlackService {

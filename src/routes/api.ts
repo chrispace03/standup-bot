@@ -53,7 +53,26 @@ router.put('/user/:slackId', async (req: Request, res: Response, next: NextFunct
   try {
     const slackId = req.params.slackId as string;
     const userService = getUserService();
-    await userService.update(slackId, req.body);
+    const existing = await userService.getBySlackId(slackId);
+    if (existing) {
+      await userService.update(slackId, req.body);
+    } else {
+      const now = new Date();
+      await userService.create({
+        slackUserId: slackId,
+        slackTeamId: req.body.slackTeamId || '',
+        displayName: req.body.displayName || slackId,
+        email: req.body.email || '',
+        timezone: req.body.timezone || 'UTC',
+        standupTime: req.body.standupTime || '09:00',
+        standupEnabled: req.body.standupEnabled ?? true,
+        standupDays: req.body.standupDays || [1, 2, 3, 4, 5],
+        googleConnected: false,
+        createdAt: now,
+        updatedAt: now,
+        ...req.body,
+      });
+    }
     const updated = await userService.getBySlackId(slackId);
     res.json(updated);
   } catch (err) {
