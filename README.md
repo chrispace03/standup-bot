@@ -65,7 +65,7 @@ Built as a portfolio project and to explore interest in project management softw
 | Claude API | AI-powered blocker analysis (via `@anthropic-ai/sdk`) |
 | OAuth 2.0 | Authentication for all services |
 | node-cron | Per-user standup scheduling |
-| Jest + Supertest | Testing (169 tests across 19 suites) |
+| Jest + Supertest | Testing (176 tests across 19 suites) |
 | ESLint | Linting (flat config + typescript-eslint) |
 | GitHub Actions | CI/CD (Node 18 + 20 matrix) |
 

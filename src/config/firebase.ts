@@ -7,13 +7,18 @@ export function initializeFirebase(): FirebaseFirestore.Firestore {
   if (db) return db;
 
   if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: config.firebase.projectId,
-        privateKey: config.firebase.privateKey.replace(/\\n/g, '\n'),
-        clientEmail: config.firebase.clientEmail,
-      }),
-    });
+    // In Firebase Functions / Cloud Run, use Application Default Credentials
+    if (process.env.K_SERVICE || process.env.FUNCTIONS_EMULATOR) {
+      admin.initializeApp();
+    } else {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: config.firebase.projectId,
+          privateKey: config.firebase.privateKey.replace(/\\n/g, '\n'),
+          clientEmail: config.firebase.clientEmail,
+        }),
+      });
+    }
   }
 
   db = admin.firestore();

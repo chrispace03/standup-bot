@@ -1,7 +1,19 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Try .env from multiple locations (local dev vs Firebase Functions)
+const envPaths = [
+  path.resolve(__dirname, '../../.env'),  // local dev (from dist/config/)
+  path.resolve(process.cwd(), '.env'),    // Firebase Functions runtime
+];
+
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
 
 export interface AppConfig {
   nodeEnv: string;
