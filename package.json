@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@sentry/node": "^10.43.0",
     "@slack/web-api": "^7.14.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

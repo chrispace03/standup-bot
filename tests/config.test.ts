@@ -9,6 +9,7 @@ function createTestConfig(overrides: Partial<Config['app']> = {}): Config {
       baseUrl: 'http://localhost:3000',
       encryptionKey: '',
       anthropicApiKey: '',
+      sentryDsn: '',
       ...overrides,
     },
     slack: { clientId: '', clientSecret: '', signingSecret: '', botToken: '' },

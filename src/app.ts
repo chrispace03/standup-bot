@@ -3,6 +3,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
+import * as Sentry from '@sentry/node';
 import { requestLogger, notFoundHandler, errorHandler } from './middleware';
 import { apiRouter, authRouter, slackRouter } from './routes';
 
@@ -34,6 +35,7 @@ export function createApp(): express.Application {
   });
 
   app.use(notFoundHandler);
+  Sentry.setupExpressErrorHandler(app);
   app.use(errorHandler);
 
   return app;

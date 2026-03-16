@@ -70,6 +70,7 @@ Built as a portfolio project and to explore interest in project management softw
 | Google Calendar API | Calendar events |
 | Claude API | AI-powered blocker analysis (via `@anthropic-ai/sdk`) |
 | OAuth 2.0 | Authentication for all services |
+| Sentry | Error monitoring (optional, activates with DSN) |
 | node-cron | Per-user standup scheduling |
 | Jest + Supertest | Testing (176 tests across 19 suites) |
 | ESLint | Linting (flat config + typescript-eslint) |
@@ -303,6 +304,7 @@ See [`.env.example`](.env.example) for the full list. Key groups:
 - **Jira**: `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_REDIRECT_URI`
 - **Google**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
 - **Anthropic**: `ANTHROPIC_API_KEY` (optional — enables AI blocker analysis in weekly summaries)
+- **Sentry**: `SENTRY_DSN` (optional — enables error monitoring)
 - **Firebase**: `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`
 
 ## License

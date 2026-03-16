@@ -1,4 +1,7 @@
-import { config, validateConfig, initializeFirebase, getDb } from './config';
+import { config, validateConfig, initializeFirebase, getDb, initSentry } from './config';
+
+// Initialize Sentry before anything else
+initSentry();
 import { createApp } from './app';
 import {
   UserService,

@@ -21,6 +21,7 @@ export interface AppConfig {
   baseUrl: string;
   encryptionKey: string;
   anthropicApiKey: string;
+  sentryDsn: string;
 }
 
 export interface SlackConfig {
@@ -71,6 +72,7 @@ function buildConfig(): Config {
       baseUrl: getEnv('BASE_URL', 'http://localhost:3000'),
       encryptionKey: getEnv('ENCRYPTION_KEY'),
       anthropicApiKey: getEnv('ANTHROPIC_API_KEY'),
+      sentryDsn: getEnv('SENTRY_DSN'),
     },
     slack: {
       clientId: getEnv('SLACK_CLIENT_ID'),

@@ -1,6 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { initializeFirebase, getDb, config } from './config';
+import { initializeFirebase, getDb, config, initSentry } from './config';
 import { createApp } from './app';
 import {
   UserService,
@@ -12,6 +12,7 @@ import {
   AIService,
 } from './services';
 
+initSentry();
 initializeFirebase();
 
 const expressApp = createApp();
