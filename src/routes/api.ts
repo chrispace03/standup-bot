@@ -142,4 +142,83 @@ router.get('/standup/history', async (req: Request, res: Response, next: NextFun
   }
 });
 
+// Dashboard endpoints
+router.get('/dashboard/users', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userService = getUserService();
+    const users = await userService.getAll();
+    res.json({ users });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/dashboard/stats', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userService = getUserService();
+    const standupService = getStandupService();
+
+    const users = await userService.getAll();
+    const recentStandups = await standupService.getRecent(200);
+
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString().split('T')[0];
+
+    const thisWeek = recentStandups.filter((s) => s.date >= sevenDaysAgo);
+    const todayStandups = recentStandups.filter((s) => s.date === today);
+    const blockerDays = thisWeek.filter(
+      (s) => s.blockers && s.blockers !== 'None',
+    );
+
+    const totalIssuesCompleted = thisWeek.reduce(
+      (sum, s) => sum + s.yesterday.length, 0,
+    );
+    const totalIssuesPlanned = thisWeek.reduce(
+      (sum, s) => sum + s.today.length, 0,
+    );
+    const totalEvents = thisWeek.reduce(
+      (sum, s) => sum + s.events.length, 0,
+    );
+
+    const userActivity = users.map((u) => {
+      const userStandups = thisWeek.filter((s) => s.userId === u.slackUserId);
+      return {
+        userId: u.slackUserId,
+        displayName: u.displayName,
+        standupsThisWeek: userStandups.length,
+        hasBlockers: userStandups.some(
+          (s) => s.blockers && s.blockers !== 'None',
+        ),
+      };
+    });
+
+    res.json({
+      totalUsers: users.length,
+      activeUsers: users.filter((u) => u.standupEnabled).length,
+      standupsToday: todayStandups.length,
+      standupsThisWeek: thisWeek.length,
+      blockersThisWeek: blockerDays.length,
+      issuesCompleted: totalIssuesCompleted,
+      issuesPlanned: totalIssuesPlanned,
+      meetingsThisWeek: totalEvents,
+      userActivity,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/dashboard/standups', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const standupService = getStandupService();
+    const records = await standupService.getRecent(limit);
+    res.json({ records });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

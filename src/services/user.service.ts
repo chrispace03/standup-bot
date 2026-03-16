@@ -56,6 +56,11 @@ export class UserService {
     return snapshot.docs.map((doc) => doc.data());
   }
 
+  async getAll(): Promise<User[]> {
+    const snapshot = await this.collection.get();
+    return snapshot.docs.map((doc) => doc.data());
+  }
+
   async delete(slackUserId: string): Promise<void> {
     await this.collection.doc(slackUserId).delete();
   }

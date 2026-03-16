@@ -17,6 +17,8 @@ Built as a portfolio project and to explore interest in project management softw
 - **Interactive messages** — Regenerate, Edit Blockers, and Skip buttons on every standup
 - **Settings modal** — configure timezone, standup time, active days, and target channel via `/standup-settings`
 - **Multi-service OAuth** — connect Slack, Jira, and Google Calendar with encrypted token storage
+- **Admin dashboard** — React + Tailwind web UI with team stats, standup feed, and user management
+- **Firebase Functions** — deployable as serverless functions with scheduled standup triggers
 
 ## Architecture
 
@@ -37,6 +39,9 @@ Built as a portfolio project and to explore interest in project management softw
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ Scheduler    │  │ Auth (OAuth) │  │ AI Service (Claude)  │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ Admin Dashboard (React + Vite + Tailwind)               │   │
+│  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
           │                │                      │
           ▼                ▼                      ▼
@@ -57,8 +62,9 @@ Built as a portfolio project and to explore interest in project management softw
 |-----------|---------|
 | Node.js + TypeScript | Runtime & language (strict mode) |
 | Express.js 5 | Web framework |
+| React + Vite + Tailwind | Admin dashboard |
 | Firebase Firestore | Database (serverless) |
-| Firebase Functions | Hosting (serverless) |
+| Firebase Functions v2 | Serverless deployment |
 | Slack API | Bot interactions, slash commands, Block Kit modals |
 | Jira Cloud REST API | Issue tracking data |
 | Google Calendar API | Calendar events |
@@ -82,7 +88,15 @@ src/
 ├── types/           # Express type augmentations
 ├── utils/           # Encryption, formatters, modals, OAuth helpers
 ├── app.ts           # Express app factory
-└── index.ts         # Server entry point
+├── functions.ts     # Firebase Functions entry point
+└── index.ts         # Local dev server entry point
+dashboard/
+├── src/
+│   ├── components/  # StatsCards, UsersTable, StandupFeed, UserDetail
+│   ├── api.ts       # API client & TypeScript types
+│   ├── App.tsx      # Main app with tabbed navigation
+│   └── main.tsx     # React entry point
+└── vite.config.ts   # Vite config (proxy, Tailwind, base path)
 tests/
 ├── helpers/         # Test utilities (Firestore mocks)
 └── *.test.ts        # Unit & integration tests (19 suites)
@@ -134,11 +148,24 @@ npm run lint
 npm run typecheck
 ```
 
-The server starts at `http://localhost:3000`. Check it's running:
+The server starts at the port configured in `.env` (default 3000). Check it's running:
 
 ```bash
 curl http://localhost:3000/api/health
 ```
+
+### Admin Dashboard
+
+The admin dashboard is a React app served at `/dashboard/`.
+
+```bash
+cd dashboard
+npm install
+npm run dev        # Dev server at http://localhost:5173/dashboard/
+npm run build      # Production build → dashboard/dist/ (served by Express)
+```
+
+The dev server proxies API requests to the backend. In production, the Express server serves the built dashboard as static files.
 
 ### Testing
 
@@ -169,6 +196,9 @@ npm run test:coverage
 | GET | `/auth/jira/callback` | Jira OAuth callback |
 | GET | `/auth/google` | Initiate Google OAuth |
 | GET | `/auth/google/callback` | Google OAuth callback |
+| GET | `/api/dashboard/users` | List all registered users |
+| GET | `/api/dashboard/stats` | Dashboard statistics & activity |
+| GET | `/api/dashboard/standups` | Recent standup records |
 | POST | `/slack/commands` | Slash command handler |
 | POST | `/slack/events` | Slack event subscriptions |
 | POST | `/slack/interactions` | Button/modal interactions |
@@ -191,6 +221,19 @@ The built-in scheduler runs every minute and handles:
 3. **Weekly summaries** — on the user's last standup day of the week, posts aggregated stats
 4. **AI analysis** — if configured, Claude analyzes the week's blockers for patterns and escalation needs
 5. **Deduplication** — skips if a standup already exists for the day
+
+## Deployment
+
+The project supports two deployment modes:
+
+- **Local / VM** — `npm start` runs the Express server with `node-cron` for scheduling
+- **Firebase Functions** — `npm run deploy` deploys as serverless functions with `onSchedule` for the scheduler tick
+
+```bash
+# Deploy to Firebase
+npm run build
+npm run deploy
+```
 
 ## Database Schema (Firestore)
 

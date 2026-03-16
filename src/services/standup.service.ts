@@ -70,6 +70,14 @@ export class StandupService {
     return snapshot.docs.map((doc) => doc.data());
   }
 
+  async getRecent(limit: number = 50): Promise<StandupRecord[]> {
+    const snapshot = await this.collection
+      .orderBy('date', 'desc')
+      .limit(limit)
+      .get();
+    return snapshot.docs.map((doc) => doc.data());
+  }
+
   async delete(date: string, userId: string): Promise<void> {
     await this.collection.doc(`${date}_${userId}`).delete();
   }

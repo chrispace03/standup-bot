@@ -1,5 +1,6 @@
 import express, { Request } from 'express';
 import { IncomingMessage, ServerResponse } from 'http';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import { requestLogger, notFoundHandler, errorHandler } from './middleware';
@@ -21,6 +22,16 @@ export function createApp(): express.Application {
   app.use('/api', apiRouter);
   app.use('/auth', authRouter);
   app.use('/slack', slackRouter);
+
+  // Serve dashboard static files
+  const dashboardPath = path.resolve(__dirname, '../dashboard/dist');
+  app.use('/dashboard', express.static(dashboardPath));
+  app.use('/dashboard', (_req, res, next) => {
+    // SPA fallback: serve index.html for non-static routes
+    res.sendFile(path.join(dashboardPath, 'index.html'), (err) => {
+      if (err) next();
+    });
+  });
 
   app.use(notFoundHandler);
   app.use(errorHandler);
