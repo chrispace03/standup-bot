@@ -47,4 +47,9 @@ describe('Database-backed routes without Firebase', () => {
     const res = await request(app).get('/api/standup/history');
     expect(res.status).toBe(400);
   });
+
+  it('GET /api/standup/by-issue returns 400 without issueKey', async () => {
+    const res = await request(app).get('/api/standup/by-issue');
+    expect(res.status).toBe(400);
+  });
 });

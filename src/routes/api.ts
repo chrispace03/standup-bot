@@ -142,6 +142,19 @@ router.get('/standup/history', async (req: Request, res: Response, next: NextFun
   }
 });
 
+router.get('/standup/by-issue', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const issueKey = req.query.issueKey as string;
+    if (!issueKey) throw new AppError('issueKey query parameter is required', 400);
+    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const standupService = getStandupService();
+    const records = await standupService.getByIssueKey(issueKey, limit);
+    res.json({ records });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Dashboard endpoints
 router.get('/dashboard/users', async (_req: Request, res: Response, next: NextFunction) => {
   try {

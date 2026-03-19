@@ -78,6 +78,20 @@ export class StandupService {
     return snapshot.docs.map((doc) => doc.data());
   }
 
+  async getByIssueKey(issueKey: string, limit: number = 10): Promise<StandupRecord[]> {
+    const snapshot = await this.collection
+      .orderBy('date', 'desc')
+      .limit(limit * 5)
+      .get();
+    const records = snapshot.docs.map((doc) => doc.data());
+    return records
+      .filter((r) =>
+        r.yesterday.some((i) => i.issueKey === issueKey) ||
+        r.today.some((i) => i.issueKey === issueKey),
+      )
+      .slice(0, limit);
+  }
+
   async delete(date: string, userId: string): Promise<void> {
     await this.collection.doc(`${date}_${userId}`).delete();
   }

@@ -66,6 +66,7 @@ Built as a portfolio project and to explore interest in project management softw
 | Firebase Firestore | Database (serverless) |
 | Firebase Functions v2 | Serverless deployment |
 | Slack API | Bot interactions, slash commands, Block Kit modals |
+| Atlassian Forge | Jira-native app (issue panel, project page, dashboard gadget) |
 | Jira Cloud REST API | Issue tracking data |
 | Google Calendar API | Calendar events |
 | Claude API | AI-powered blocker analysis (via `@anthropic-ai/sdk`) |
@@ -98,6 +99,13 @@ dashboard/
 │   ├── App.tsx      # Main app with tabbed navigation
 │   └── main.tsx     # React entry point
 └── vite.config.ts   # Vite config (proxy, Tailwind, base path)
+forge/
+├── manifest.yml     # Forge app definition (modules, permissions)
+├── src/
+│   ├── resolvers/   # Backend resolvers (issue-panel, project-page, dashboard)
+│   ├── frontend/    # UI Kit React components for each module
+│   └── utils/       # Shared API client for backend calls
+└── static/          # App icon
 tests/
 ├── helpers/         # Test utilities (Firestore mocks)
 └── *.test.ts        # Unit & integration tests (19 suites)
@@ -190,6 +198,7 @@ npm run test:coverage
 | PUT | `/api/user/:slackId` | Update user settings |
 | POST | `/api/standup/trigger` | Trigger standup generation |
 | GET | `/api/standup/history` | Get standup history for a user |
+| GET | `/api/standup/by-issue` | Get standups mentioning a Jira issue key |
 | POST | `/api/scheduler/tick` | Trigger scheduler tick (for external schedulers) |
 | GET | `/auth/slack` | Initiate Slack OAuth |
 | GET | `/auth/slack/callback` | Slack OAuth callback |
@@ -222,6 +231,40 @@ The built-in scheduler runs every minute and handles:
 3. **Weekly summaries** — on the user's last standup day of the week, posts aggregated stats
 4. **AI analysis** — if configured, Claude analyzes the week's blockers for patterns and escalation needs
 5. **Deduplication** — skips if a standup already exists for the day
+
+## Forge App (Jira Integration)
+
+The project includes an Atlassian Forge app that surfaces standup data natively inside Jira via three extension points:
+
+| Module | Description |
+|--------|-------------|
+| **Issue Panel** — "Standup Mentions" | Shows which standups reference a specific Jira issue |
+| **Project Page** — "Team Standups" | Standup feed, stats, and team activity for a project |
+| **Dashboard Gadget** — "Today's Standups" | Compact summary widget for Jira dashboards |
+
+The Forge app calls the existing backend API — no data duplication. Resolvers fetch standup data from the Express backend and render it using Atlassian's UI Kit components.
+
+### Forge Setup
+
+```bash
+# Install Forge CLI globally
+npm install -g @forge/cli
+
+# Set up the Forge app
+cd forge
+npm install
+
+# Configure environment variables
+forge variables set BACKEND_URL https://your-backend.com
+forge variables set API_KEY your-secret-key
+
+# Deploy and install
+forge deploy
+forge install
+
+# Local development (tunnels to your local backend)
+forge tunnel
+```
 
 ## Deployment
 

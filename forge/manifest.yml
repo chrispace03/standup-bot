@@ -1,0 +1,57 @@
+modules:
+  jira:issuePanel:
+    - key: standup-mentions-panel
+      resource: issue-panel-resource
+      resolver:
+        function: issue-panel-resolver
+      title: Standup Mentions
+      icon: resource:icon
+
+  jira:projectPage:
+    - key: team-standups-page
+      resource: project-page-resource
+      resolver:
+        function: project-page-resolver
+      title: Team Standups
+      icon: resource:icon
+
+  jira:dashboardGadget:
+    - key: standup-dashboard-gadget
+      resource: dashboard-gadget-resource
+      resolver:
+        function: dashboard-gadget-resolver
+      title: Today's Standups
+      description: Quick view of today's standup activity
+
+  function:
+    - key: issue-panel-resolver
+      handler: resolvers/issue-panel.handler
+    - key: project-page-resolver
+      handler: resolvers/project-page.handler
+    - key: dashboard-gadget-resolver
+      handler: resolvers/dashboard-gadget.handler
+
+resources:
+  - key: issue-panel-resource
+    path: src/frontend/issue-panel.tsx
+  - key: project-page-resource
+    path: src/frontend/project-page.tsx
+  - key: dashboard-gadget-resource
+    path: src/frontend/dashboard-gadget.tsx
+  - key: icon
+    path: static/icon.svg
+
+permissions:
+  scopes:
+    - read:jira-work
+  external:
+    fetch:
+      backend:
+        - '*.cloudfunctions.net'
+        - 'localhost:3000'
+
+app:
+  name: Standup Bot for Jira
+  runtime:
+    name: nodejs18.x
+  id: ari:cloud:ecosystem::app/to-be-generated

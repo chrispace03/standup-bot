@@ -69,6 +69,63 @@ describe('StandupService', () => {
     });
   });
 
+  describe('getByIssueKey', () => {
+    it('returns standups where the issue appears in yesterday or today', async () => {
+      const standup1: StandupRecord = {
+        ...mockStandup,
+        userId: 'U1',
+        date: '2026-03-04',
+        yesterday: [{ issueKey: 'PROJ-10', summary: 'Task A', status: 'Done', issueType: 'Story', url: '' }],
+        today: [],
+      };
+      const standup2: StandupRecord = {
+        ...mockStandup,
+        userId: 'U2',
+        date: '2026-03-05',
+        yesterday: [],
+        today: [{ issueKey: 'PROJ-10', summary: 'Task A', status: 'In Progress', issueType: 'Story', url: '' }],
+      };
+      const standup3: StandupRecord = {
+        ...mockStandup,
+        userId: 'U3',
+        date: '2026-03-05',
+        yesterday: [{ issueKey: 'PROJ-99', summary: 'Other', status: 'Done', issueType: 'Bug', url: '' }],
+        today: [],
+      };
+
+      mocks.mockQuerySnapshot.docs = [
+        { data: () => standup1 },
+        { data: () => standup2 },
+        { data: () => standup3 },
+      ];
+
+      const result = await service.getByIssueKey('PROJ-10');
+      expect(result).toHaveLength(2);
+      expect(mocks.mockCollection.orderBy).toHaveBeenCalledWith('date', 'desc');
+    });
+
+    it('respects the limit parameter', async () => {
+      const standups = Array.from({ length: 5 }, (_, i) => ({
+        ...mockStandup,
+        userId: `U${i}`,
+        date: `2026-03-0${i + 1}`,
+        yesterday: [{ issueKey: 'PROJ-10', summary: 'Task', status: 'Done', issueType: 'Story', url: '' }],
+        today: [],
+      }));
+
+      mocks.mockQuerySnapshot.docs = standups.map((s) => ({ data: () => s }));
+
+      const result = await service.getByIssueKey('PROJ-10', 2);
+      expect(result).toHaveLength(2);
+    });
+
+    it('defaults to limit of 10', async () => {
+      mocks.mockQuerySnapshot.docs = [];
+      await service.getByIssueKey('PROJ-10');
+      expect(mocks.mockCollection.limit).toHaveBeenCalledWith(50);
+    });
+  });
+
   describe('delete', () => {
     it('deletes with composite key', async () => {
       await service.delete('2026-03-04', 'U12345');
