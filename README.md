@@ -73,7 +73,8 @@ Built as a portfolio project and to explore interest in project management softw
 | OAuth 2.0 | Authentication for all services |
 | Sentry | Error monitoring (optional, activates with DSN) |
 | node-cron | Per-user standup scheduling |
-| Jest + Supertest | Testing (176 tests across 19 suites) |
+| Jest + Supertest | Backend testing (22 suites) |
+| Vitest + Testing Library | Dashboard component testing |
 | ESLint | Linting (flat config + typescript-eslint) |
 | GitHub Actions | CI/CD (Node 18 + 20 matrix) |
 
@@ -108,7 +109,7 @@ forge/
 └── static/          # App icon
 tests/
 ├── helpers/         # Test utilities (Firestore mocks)
-└── *.test.ts        # Unit & integration tests (19 suites)
+└── *.test.ts        # Unit & integration tests (22 suites)
 ```
 
 ## Getting Started
@@ -333,6 +334,8 @@ Consider following up with the platform team to prevent recurrence.
 ## Security
 
 - OAuth tokens are encrypted at rest using AES-256-GCM
+- HMAC-signed OAuth state parameters prevent CSRF and replay attacks (10-minute TTL)
+- Rate limiting on auth endpoints (10 requests per IP per 15 minutes)
 - Helmet.js for HTTP security headers
 - CORS configured for API access
 - Error messages masked in production (no stack traces leaked)

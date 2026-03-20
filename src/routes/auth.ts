@@ -1,17 +1,22 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { WebClient } from '@slack/web-api';
 import { config, getDb } from '../config';
-import { AppError } from '../middleware';
+import { AppError, rateLimit } from '../middleware';
 import { UserService } from '../services/user.service';
 import { TeamService } from '../services/team.service';
 import { TokenService } from '../services/token.service';
 import { JiraService } from '../services/jira.service';
 import { buildJiraAuthUrl, exchangeJiraCode, getAccessibleResources } from '../utils/jira-auth.utils';
 import { buildGoogleAuthUrl, exchangeGoogleCode } from '../utils/google-auth.utils';
+import { createOAuthState, verifyOAuthState } from '../utils/oauth-state';
 
 const router = Router();
 
 const SLACK_SCOPES = ['chat:write', 'commands', 'users:read', 'channels:read'];
+
+// Rate limit: 10 auth requests per IP per 15 minutes
+const authRateLimit = rateLimit(10, 15 * 60 * 1000);
+router.use(authRateLimit);
 
 router.get('/slack', (_req: Request, res: Response) => {
   const params = new URLSearchParams({
@@ -107,8 +112,8 @@ router.get('/jira', (req: Request, res: Response, next: NextFunction) => {
     const slackUserId = req.query.slackUserId as string;
     if (!slackUserId) throw new AppError('slackUserId query parameter is required', 400);
 
-    // TODO: Use signed state parameter in production (CSRF protection)
-    const authUrl = buildJiraAuthUrl(config.jira.clientId, config.jira.redirectUri, slackUserId);
+    const state = createOAuthState(slackUserId, config.app.encryptionKey);
+    const authUrl = buildJiraAuthUrl(config.jira.clientId, config.jira.redirectUri, state);
     res.redirect(authUrl);
   } catch (err) {
     next(err);
@@ -118,9 +123,16 @@ router.get('/jira', (req: Request, res: Response, next: NextFunction) => {
 router.get('/jira/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const code = req.query.code as string;
-    const slackUserId = req.query.state as string;
+    const state = req.query.state as string;
     if (!code) throw new AppError('Missing authorization code', 400);
-    if (!slackUserId) throw new AppError('Missing state parameter', 400);
+    if (!state) throw new AppError('Missing state parameter', 400);
+
+    let slackUserId: string;
+    try {
+      slackUserId = verifyOAuthState(state, config.app.encryptionKey);
+    } catch {
+      throw new AppError('Invalid or expired OAuth state', 403);
+    }
 
     // Exchange code for tokens
     const tokenResponse = await exchangeJiraCode(
@@ -169,7 +181,8 @@ router.get('/google', (req: Request, res: Response, next: NextFunction) => {
     const slackUserId = req.query.slackUserId as string;
     if (!slackUserId) throw new AppError('slackUserId query parameter is required', 400);
 
-    const authUrl = buildGoogleAuthUrl(config.google.clientId, config.google.redirectUri, slackUserId);
+    const state = createOAuthState(slackUserId, config.app.encryptionKey);
+    const authUrl = buildGoogleAuthUrl(config.google.clientId, config.google.redirectUri, state);
     res.redirect(authUrl);
   } catch (err) {
     next(err);
@@ -179,9 +192,16 @@ router.get('/google', (req: Request, res: Response, next: NextFunction) => {
 router.get('/google/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const code = req.query.code as string;
-    const slackUserId = req.query.state as string;
+    const state = req.query.state as string;
     if (!code) throw new AppError('Missing authorization code', 400);
-    if (!slackUserId) throw new AppError('Missing state parameter', 400);
+    if (!state) throw new AppError('Missing state parameter', 400);
+
+    let slackUserId: string;
+    try {
+      slackUserId = verifyOAuthState(state, config.app.encryptionKey);
+    } catch {
+      throw new AppError('Invalid or expired OAuth state', 403);
+    }
 
     const tokenResponse = await exchangeGoogleCode(
       code,
